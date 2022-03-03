@@ -54,9 +54,10 @@ Run `retrieval.py` to get the hsk code suggestion and supporting facts for the i
 $ python evaluation.py --model koelectra --model-path1 ./output/model_85.pt --input_desc ./input.txt
 ```
 ## Expected Results
-(설명)
+(설명추가예정)
 
 |  | | HS4 | | | HS6 | | 
+| --- | --- | --- | --- | ---  | ---  | --- | 
 |  | k=1 | k=3 | k=5 | k=1  | k=3 | k=5 | 
 | --- | --- | --- | --- | ---  | ---  | --- | 
 | KoBERT | 84.51 | 91.07 | 92.22 | 78.88 | 87.70 | 90.06 | 
