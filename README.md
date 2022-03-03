@@ -4,8 +4,15 @@
 (설명?)
 
 ## Requirements
-* Python 3
-* (작성)
+It has been tested under environment.
+
+* python ==3.9.6
+* numpy == 1.21.1
+* pandas ==1.3.1
+* pytorch == 19.0.9
+* transformers == 4.9.2
+* sklearn == 0.24.2
+* tqdm == 4.62.0
 
 ## Step1. Train the model
 Run `train.py` to train the model for the classification. It has the following arguments:
@@ -18,9 +25,9 @@ Run `train.py` to train the model for the classification. It has the following a
 * `--learning_rate`: Learning rate (1e-5 by default).
 * `--data_path`: Path where the data for the train is stored.
 * `--output_path`: Path to store the model.
-
-  $ python train.py --model koelectra
-
+```
+$ python train.py --model koelectra
+```
 ## Step2. Evaluate the model
 Run `evaluation.py` to evaluate the model trained at step1. It has the following arguments:
 
@@ -29,9 +36,9 @@ Run `evaluation.py` to evaluate the model trained at step1. It has the following
 * `--model`: NLP model to use. It can be "kobert", "koelectra", "klue".
 * `--model_path`: File name to load the trained classifition model in step1.
 * `--data_path`: Path where the data for the evaluation is stored.
-
-  $ python evaluation.py --model koelectra --model-path ./output/model_85.pt
-
+```
+$ python evaluation.py --model koelectra --model-path ./output/model_85.pt
+```
 ## Step3. Use the model for the prediction and supporting facts
 Run `retrieval.py` to get the hsk code suggestion and supporting facts for the input description. It has the following arguments:
 
@@ -43,9 +50,9 @@ Run `retrieval.py` to get the hsk code suggestion and supporting facts for the i
 * `--input_desc`: File name where input description is stored.
 * `--highlight_num`: Number of sentences to highlight (7 by default).
 * `--compete_num`: Number of subheadings to show (3 by default).
-
-  $ python evaluation.py --model koelectra --model-path1 ./output/model_85.pt --input_desc ./input.txt
-
+```
+$ python evaluation.py --model koelectra --model-path1 ./output/model_85.pt --input_desc ./input.txt
+```
 ## Expected Results
 (설명)
 
