@@ -1,7 +1,7 @@
 # HS_classification
 
 ## Introduction
-(설명?)
+(설명추가예정)
 
 ## Requirements
 It has been tested under environment.
@@ -56,7 +56,7 @@ $ python evaluation.py --model koelectra --model-path1 ./output/model_85.pt --in
 ## Expected Results
 (설명)
 
-|  || HS4 ||| HS6 || 
+|  | | HS4 | | | HS6 | | 
 |  | k=1 | k=3 | k=5 | k=1  | k=3 | k=5 | 
 | --- | --- | --- | --- | ---  | ---  | --- | 
 | KoBERT | 84.51 | 91.07 | 92.22 | 78.88 | 87.70 | 90.06 | 
