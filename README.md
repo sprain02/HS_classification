@@ -53,7 +53,7 @@ Run `retrieval.py` to get the hsk code suggestion and supporting facts for the i
 ```
 $ python evaluation.py --model koelectra --model-path1 ./output/model_85.pt --input_desc ./input.txt
 ```
-## Expected Results
+<!-- ## Expected Results
 (설명추가예정)
 
 |  || HS4 ||| HS6 || 
@@ -68,3 +68,4 @@ $ python evaluation.py --model koelectra --model-path1 ./output/model_85.pt --in
 | KoBERT | 84.51 | 91.07 | 92.22 | 78.88 | 87.70 | 90.06 | 
 | KoELECTRA | 87.48 | 93.42 | 94.92 | 83.22 | 90.99 | 92.88 | 
 | KLUE-RoBERTa | 89.24 | 95.50 | 96.49 | 86.06 | 93.98 | 95.25 | 
+ -->
