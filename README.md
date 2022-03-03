@@ -1,10 +1,10 @@
 # HS_classification
 
 ## Introduction
-(설명추가예정)
+Implementation of our paper Explainable Product Classification for Customs.
 
 ## Requirements
-It has been tested under environment.
+The code has been tested under environment.
 
 * python ==3.9.6
 * numpy == 1.21.1
