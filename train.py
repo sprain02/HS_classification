@@ -37,19 +37,6 @@ def _parse_args():
     return parser.parse_args()
 
 
-args = _parse_args()
-
-epochs = list(range(args.epochs))
-batch_size = args.batch_size
-num_labels = args.num_labels
-learning_rate = args.learning_rate
-data_path = args.data_path
-output_path = args.output_path
-with open('data/subheading_idx.pickle', 'rb') as fp:
-    subheading_dic = pickle.load(fp)
-
-device = torch.device("cuda")
-
 class HSKDataset(Dataset):
   
     def __init__(self, dataset):
@@ -100,51 +87,65 @@ class HSKDataset(Dataset):
 
         return input_ids, attention_mask, hsk_ind #y
 
-# make dataset
-train_data = pd.read_csv(data_path)[['hsk', 'description']]
-train_dataset = HSKDataset(train_data)
+def load_model(args, device):
+    # make model
+    if args.model == 'kobert':
+        model = BertForSequenceClassification.from_pretrained('skt/kobert-base-v1', num_labels=args.num_labels)
+    elif args.model == 'koelectra':
+        model = ElectraForSequenceClassification.from_pretrained("monologg/koelectra-base-v3-discriminator" , num_labels=args.num_labels)
+    elif args.model == 'klue':
+        model = AutoModelForSequenceClassification.from_pretrained("klue/roberta-large", num_labels=args.num_labels)
+    model = nn.DataParallel(model)
+    model.cuda()
+    if args.load:
+        model.load_state_dict(torch.load(args.load))
 
-# make model
-if args.model == 'kobert':
-    model = BertForSequenceClassification.from_pretrained('skt/kobert-base-v1', num_labels=args.num_labels)
-elif args.model == 'koelectra':
-    model = ElectraForSequenceClassification.from_pretrained("monologg/koelectra-base-v3-discriminator" , num_labels=args.num_labels)
-elif args.model == 'klue':
-    model = AutoModelForSequenceClassification.from_pretrained("klue/roberta-large", num_labels=args.num_labels)
-model = nn.DataParallel(model)
-model.cuda()
-if args.load:
-    model.load_state_dict(torch.load(args.load))
+    return model
 
-# load data
-optimizer = AdamW(model.parameters(), lr=learning_rate)
-train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+def main(args):
 
-# train and save the model
-for e in epochs:
-    correct = 0
-    total = 0
+    device = torch.device("cuda")
 
-    model.train()
+    model = load_model(args, device)
+    optimizer = AdamW(model.parameters(), lr=args.learning_rate)
 
-    start = time.time() 
+    # make dataset
+    train_data = pd.read_csv(args.data_path)[['hsk', 'description']]
+    train_dataset = HSKDataset(train_data)
+    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
+    with open('data/subheading_idx.pickle', 'rb') as fp:
+        subheading_dic = pickle.load(fp)
 
-    for input_ids_batch, attention_masks_batch, y_batch in tqdm(train_loader):
-        optimizer.zero_grad()
-        y_batch = y_batch.to(device)
-        y_pred = model(input_ids_batch.to(device), attention_mask=attention_masks_batch.to(device))[0]
+    # train and save the model
+    for e in list(range(args.epochs)):
+        correct = 0
+        total = 0
 
-        loss = F.cross_entropy(y_pred, y_batch)
-        loss.backward()
-        optimizer.step()
+        model.train()
 
-        _, predicted = torch.max(y_pred, 1)
-        correct += (predicted == y_batch).sum()
-        total += len(y_batch)
+        start = time.time() 
 
-    acc = (correct.float() / total).item()
-    end = time.time() 
-    sec = (end - start)
+        for input_ids_batch, attention_masks_batch, y_batch in tqdm(train_loader):
+            optimizer.zero_grad()
+            y_batch = y_batch.to(device)
+            y_pred = model(input_ids_batch.to(device), attention_mask=attention_masks_batch.to(device))[0]
 
-    torch.save(model.state_dict(), output_path+"/model_"+str(e)+".pt")
-    print("epoch:", e, "Train Loss:", loss, "Accuracy:", acc, "time:", datetime.timedelta(seconds=sec))
+            loss = F.cross_entropy(y_pred, y_batch)
+            loss.backward()
+            optimizer.step()
+
+            _, predicted = torch.max(y_pred, 1)
+            correct += (predicted == y_batch).sum()
+            total += len(y_batch)
+
+        acc = (correct.float() / total).item()
+        end = time.time() 
+        sec = (end - start)
+
+        torch.save(model.state_dict(), args.output_path+"/model_"+str(e)+".pt")
+        print("epoch:", e, "Train Loss:", loss, "Accuracy:", acc, "time:", datetime.timedelta(seconds=sec))
+
+
+if __name__ == '__main__':
+    args = _parse_args()
+    main(args)

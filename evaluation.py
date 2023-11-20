@@ -18,7 +18,7 @@ def _parse_args():
                         help='Batch size')
     parser.add_argument('-n', '--num_labels', default=925, type=int,
                         help='Number of classes')
-    parser.add_argument('-m', '--model', default="koelectra" type=str, 
+    parser.add_argument('-m', '--model', default="koelectra", type=str, 
                         help='Model to use')
     parser.add_argument('--model_path', default="./output/model_1.pt", type=str,
                         help='Filename to load trained model.')
@@ -26,20 +26,6 @@ def _parse_args():
                         help='Data path')
     
     return parser.parse_args()
-
-
-args = _parse_args()
-
-batch_size = args.batch_size
-num_labels = args.num_labels
-model_path = args.model_path
-data_path = args.data_path
-
-with open('data/subheading_idx.pickle', 'rb') as fp: #check!
-    hsk_dic = pickle.load(fp)
-    hsk_dic_inv = {v: k for k, v in hsk_dic.items()}
-
-device = torch.device("cuda")
 
 class HSKDataset(Dataset):
   
@@ -57,28 +43,28 @@ class HSKDataset(Dataset):
             self.tokenizer = AutoTokenizer.from_pretrained("klue/roberta-large") 
 
         for i in range(len(dataset)):
-        hsk = str(dataset.loc[i]['hsk'].item())[:6] 
-        if (hsk_dic.get(int(hsk)) == None):
-            continue
-        hsk_ind = hsk_dic.get(int(hsk))-1
-        if type(dataset.loc[i]['description']) == type(0.1):
-            continue
-        desc = dataset.loc[i]['description']
+            hsk = str(dataset.loc[i]['hsk'].item())[:6] 
+            if (hsk_dic.get(int(hsk)) == None):
+                continue
+            hsk_ind = hsk_dic.get(int(hsk))-1
+            if type(dataset.loc[i]['description']) == type(0.1):
+                continue
+            desc = dataset.loc[i]['description']
 
-        inputs = self.tokenizer( # TODO
-            desc, 
-            return_tensors='pt',
-            truncation=True,
-            max_length=512, 
-            pad_to_max_length=True,
-            add_special_tokens=True
-            )
-        input_ids = inputs['input_ids'][0]
-        attention_mask = inputs['attention_mask'][0]
+            inputs = self.tokenizer( 
+                desc, 
+                return_tensors='pt',
+                truncation=True,
+                max_length=512, 
+                pad_to_max_length=True,
+                add_special_tokens=True
+                )
+            input_ids = inputs['input_ids'][0]
+            attention_mask = inputs['attention_mask'][0]
 
-        self.labels.append(hsk_ind)
-        self.input_ids.append(input_ids)
-        self.attention_mask.append(attention_mask)
+            self.labels.append(hsk_ind)
+            self.input_ids.append(input_ids)
+            self.attention_mask.append(attention_mask)
   
     def __len__(self):
         return len(self.labels)
@@ -90,59 +76,76 @@ class HSKDataset(Dataset):
 
         return input_ids, attention_mask, hsk_ind
 
-# make dataset
-test_data = pd.read_csv(data_path)[['hsk', 'description']]
-test_data = test_data.reset_index()
-test_dataset = NSMCDataset(test_data)
+def load_model(args, device):
 
-# make model
-test_loader = HSKLoader(test_dataset, batch_size, shuffle=True)
+    if args.model == 'kobert':
+        model = BertForSequenceClassification.from_pretrained('skt/kobert-base-v1', num_labels=args.num_labels)
+    elif args.model == 'koelectra':
+        model = ElectraForSequenceClassification.from_pretrained("monologg/koelectra-base-v3-discriminator" , num_labels=args.num_labels)
+    elif args.model == 'klue':
+        model = AutoModelForSequenceClassification.from_pretrained("klue/roberta-large", num_labels=args.num_labels)
+    model = nn.DataParallel(model)
+    model.to(device)
+    model.load_state_dict(torch.load(args.model_path))
+    model.eval()   
 
-# evaluate
-test_total = 0
+    return model
 
-acc_top1 = 0
-acc_top3 = 0
-acc_top5 = 0
+def main():
+    args = _parse_args()
 
-if args.model == 'kobert':
-    model = BertForSequenceClassification.from_pretrained('skt/kobert-base-v1', num_labels=args.num_labels)
-elif args.model == 'koelectra':
-    model = ElectraForSequenceClassification.from_pretrained("monologg/koelectra-base-v3-discriminator" , num_labels=args.num_labels)
-elif args.model == 'klue':
-    model = AutoModelForSequenceClassification.from_pretrained("klue/roberta-large", num_labels=args.num_labels)
-model = nn.DataParallel(model)
-model.cuda()
-model.load_state_dict(torch.load(model_path)) #check!
+    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+    model = load_model(args, device)
 
-model.eval()   
+    with open('data/subheading_idx.pickle', 'rb') as fp: #check!
+        hsk_dic = pickle.load(fp)
+        hsk_dic_inv = {v: k for k, v in hsk_dic.items()}
 
-for input_ids_batch, attention_masks_batch, y_batch in tqdm(test_loader):
-    y_batch = y_batch.to(device)
-    y_pred = model(input_ids_batch.to(device), attention_mask=attention_masks_batch.to(device))[0]
+    # make dataset
+    test_data = pd.read_csv(args.data_path)[['hsk', 'description']]
+    test_data = test_data.reset_index()
+    test_dataset = NSMCDataset(test_data)
 
-    _, predicted = torch.max(y_pred, 1)
 
-    # top1 accuracy
-    acc_top1 += (predicted == y_batch).sum()
-    
-    # top3 accuracy
-    _, top3 = torch.sort(y_pred)
-    acc_top3 += (top3[:, -1] == y_batch).sum()
-    acc_top3 += (top3[:, -2] == y_batch).sum()
-    acc_top3 += (top3[:, -3] == y_batch).sum()
+    # make model
+    test_loader = HSKLoader(test_dataset, args.batch_size, shuffle=True)
 
-    # top5 accuracy
-    _, top5 = torch.sort(y_pred)
-    acc_top5 += (top5[:, -1] == y_batch).sum()
-    acc_top5 += (top5[:, -2] == y_batch).sum()
-    acc_top5 += (top5[:, -3] == y_batch).sum()
-    acc_top5 += (top5[:, -4] == y_batch).sum()
-    acc_top5 += (top5[:, -5] == y_batch).sum()
+    # evaluate
+    test_total = 0
 
-    test_total += len(y_batch)
+    acc_top1 = 0
+    acc_top3 = 0
+    acc_top5 = 0
 
-acc_top1 = (acc_top1.float() / test_total)
-acc_top3 = (acc_top3.float() / test_total)
-acc_top5 = (acc_top5.float() / test_total)
-print(acc_top1, acc_top3, acc_top5)
+    for input_ids_batch, attention_masks_batch, y_batch in tqdm(test_loader):
+        y_batch = y_batch.to(device)
+        y_pred = model(input_ids_batch.to(device), attention_mask=attention_masks_batch.to(device))[0]
+
+        _, predicted = torch.max(y_pred, 1)
+
+        # top1 accuracy
+        acc_top1 += (predicted == y_batch).sum()
+        
+        # top3 accuracy
+        _, top3 = torch.sort(y_pred)
+        acc_top3 += (top3[:, -1] == y_batch).sum()
+        acc_top3 += (top3[:, -2] == y_batch).sum()
+        acc_top3 += (top3[:, -3] == y_batch).sum()
+
+        # top5 accuracy
+        _, top5 = torch.sort(y_pred)
+        acc_top5 += (top5[:, -1] == y_batch).sum()
+        acc_top5 += (top5[:, -2] == y_batch).sum()
+        acc_top5 += (top5[:, -3] == y_batch).sum()
+        acc_top5 += (top5[:, -4] == y_batch).sum()
+        acc_top5 += (top5[:, -5] == y_batch).sum()
+
+        test_total += len(y_batch)
+
+    acc_top1 = (acc_top1.float() / test_total)
+    acc_top3 = (acc_top3.float() / test_total)
+    acc_top5 = (acc_top5.float() / test_total)
+    print(acc_top1, acc_top3, acc_top5)
+
+if __name__ == '__main__':
+    main()  
